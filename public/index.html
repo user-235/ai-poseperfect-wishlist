@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PosePerfect AI — Coming Soon</title>
+<!-- Inline favicon — no external file needed, fixes 404s -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23d4823a'/><circle cx='50' cy='22' r='10' fill='white'/><line x1='50' y1='32' x2='50' y2='62' stroke='white' stroke-width='6' stroke-linecap='round'/><line x1='50' y1='42' x2='30' y2='55' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='42' x2='72' y2='52' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='62' x2='38' y2='82' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='62' x2='62' y2='82' stroke='white' stroke-width='5' stroke-linecap='round'/></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23d4823a'/><circle cx='50' cy='22' r='10' fill='white'/><line x1='50' y1='32' x2='50' y2='62' stroke='white' stroke-width='6' stroke-linecap='round'/><line x1='50' y1='42' x2='30' y2='55' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='42' x2='72' y2='52' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='62' x2='38' y2='82' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='62' x2='62' y2='82' stroke='white' stroke-width='5' stroke-linecap='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -943,45 +946,23 @@
 </footer>
 
 <script>
-  // ═══════════════════════════════════════════════════
-  //  SUPABASE CONFIG — paste your values from:
-  //  Supabase Dashboard → Project Settings → API
-  // ═══════════════════════════════════════════════════
-  const SUPABASE_URL  = '';   // leave blank
-  const SUPABASE_ANON = '';   // leave blank
-
-  // No SDK needed — talk to Supabase REST API directly with fetch()
-  // This avoids ALL CDN/tracking-prevention/storage-access issues
-  const isConfigured =
-    !SUPABASE_URL.includes('YOUR_PROJECT_ID') &&
-    !SUPABASE_ANON.includes('YOUR_ANON_PUBLIC_KEY');
-
-  if (!isConfigured) {
-    console.warn('⚠️ PosePerfect: Supabase credentials not set. Running in demo mode — submissions will NOT be saved.');
-  }
-
+  // ── Calls /api/submit (Vercel serverless function) ──
+  // Supabase keys live in Vercel env vars, never in this file
   async function insertRow(payload) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/wishlist_responses`, {
+    const res = await fetch('/api/submit', {
       method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        SUPABASE_ANON,
-        'Authorization': 'Bearer ' + SUPABASE_ANON,
-        'Prefer':        'return=minimal'   // don't return the inserted row
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `HTTP ${res.status}`);
-    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+    return data;
   }
 
-  // ── Custom cursor ──────────────────────────────────
+  // ── Custom cursor ────────────────────────────────────
   const cursor = document.getElementById('cursor');
   const ring   = document.getElementById('cursor-ring');
   let mx = 0, my = 0, rx = 0, ry = 0;
-
   document.addEventListener('mousemove', e => {
     mx = e.clientX; my = e.clientY;
     cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
@@ -996,25 +977,25 @@
     el.addEventListener('mouseleave', () => { cursor.style.width='12px'; cursor.style.height='12px'; ring.style.width='36px'; ring.style.height='36px'; });
   });
 
-  // ── Star rating ────────────────────────────────────
+  // ── Star rating ──────────────────────────────────────
   let stars = 0;
   function setStars(v) {
     stars = v;
     document.querySelectorAll('.star-btn').forEach((b, i) => b.classList.toggle('active', i < v));
   }
 
-  // ── Fav toggle ─────────────────────────────────────
+  // ── Fav toggle ───────────────────────────────────────
   function toggleFav(btn) {
     btn.textContent = btn.textContent.trim() === '♡' ? '❤️' : '♡';
   }
 
-  // ── Scroll reveal ──────────────────────────────────
+  // ── Scroll reveal ────────────────────────────────────
   const obs = new IntersectionObserver(entries => {
     entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
   }, { threshold: 0.1 });
   document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 
-  // ── Smooth scroll ──────────────────────────────────
+  // ── Smooth scroll ────────────────────────────────────
   document.querySelectorAll('a[href^="#"]').forEach(a => {
     a.addEventListener('click', e => {
       const t = document.querySelector(a.getAttribute('href'));
@@ -1022,21 +1003,21 @@
     });
   });
 
-  // ── Form submit → Supabase REST API ──────────────
+  // ── Form submit → /api/submit → Supabase ─────────────
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const fname   = document.getElementById('fname').value.trim();
-    const lname   = document.getElementById('lname').value.trim();
-    const email   = document.getElementById('email').value.trim();
-    const role    = document.getElementById('role').value;
-    const message = document.getElementById('message').value.trim();
-    const device  = document.getElementById('device').value;
-    const hear    = document.getElementById('hear').value;
+    const fname    = document.getElementById('fname').value.trim();
+    const lname    = document.getElementById('lname').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const role     = document.getElementById('role').value;
+    const message  = document.getElementById('message').value.trim();
+    const device   = document.getElementById('device').value;
+    const hear     = document.getElementById('hear').value;
     const features = [...document.querySelectorAll('.form-check input[type=checkbox]:checked')]
                        .map(cb => cb.value);
 
-    // Validate
+    // Client-side validation
     if (!fname || !email || !message) {
       showFormError('Please fill in First Name, Email, and Message.');
       return;
@@ -1060,31 +1041,13 @@
       heard_from:        hear     || null
     };
 
-    // Demo mode — credentials not set yet
-    if (!isConfigured) {
-      console.log('Demo mode — would have saved:', payload);
-      setTimeout(() => {
-        document.getElementById('form-wrapper').style.display = 'none';
-        document.getElementById('successMsg').style.display   = 'block';
-      }, 700);
-      return;
-    }
-
-    // Live mode — POST directly to Supabase REST (no SDK, no CDN)
     try {
-    async function insertRow(payload) {
-    const res = await fetch('/api/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
-}
+      await insertRow(payload);
+      // ✅ Success — show thank you screen
+      document.getElementById('form-wrapper').style.display = 'none';
+      document.getElementById('successMsg').style.display   = 'block';
     } catch (err) {
-      console.error('Insert failed:', err);
+      console.error('Submit failed:', err);
       setSubmitState('idle');
       showFormError('Could not save — please try again. (' + err.message + ')');
     }
